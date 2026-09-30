@@ -11,9 +11,8 @@
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-  <!-- FFmpeg.wasm v0.12+ -->
-  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.7/dist/umd/ffmpeg.js"></script>
-  <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+  <!-- FFmpeg.wasm v0.11.6 (Highly Stable Version for GitHub Pages) -->
+  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 
   <style>
     * { box-sizing: border-box; font-family: 'Inter', sans-serif; }
@@ -51,7 +50,7 @@
         <div>
           <div class="flex items-center gap-2">
             <h1 class="font-extrabold text-slate-900 text-base sm:text-lg leading-none tracking-tight">MediaExtract Pro</h1>
-            <span class="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded uppercase">FFmpeg v0.12</span>
+            <span class="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded uppercase">GitHub Pages Safe</span>
           </div>
           <p class="text-[11px] text-slate-500 mt-0.5 hidden sm:block font-medium">Extract Audio • Mute Video • 100% Offline</p>
         </div>
@@ -77,7 +76,7 @@
           <div id="empty-state" class="space-y-3 z-10">
             <div class="w-14 h-14 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto text-2xl mb-1">📼</div>
             <h3 class="text-sm font-bold text-slate-800">Drop MP4, MKV, or WEBM here</h3>
-            <p class="text-[11px] text-slate-500 max-w-xs mx-auto">No file size limit. Processed natively in browser.</p>
+            <p class="text-[11px] text-slate-500 max-w-xs mx-auto">No file size limit. Processed natively in browser without uploads.</p>
             <div class="pt-3">
               <label class="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg cursor-pointer transition shadow-md">
                 Browse Video
@@ -131,7 +130,7 @@
         <div class="bg-slate-800 px-4 py-2.5 flex items-center justify-between border-b border-slate-700">
           <div class="flex items-center gap-2">
             <div class="flex gap-1.5"><div class="w-3 h-3 rounded-full bg-rose-500"></div><div class="w-3 h-3 rounded-full bg-amber-500"></div><div class="w-3 h-3 rounded-full bg-emerald-500"></div></div>
-            <span class="text-xs font-bold text-slate-400 ml-2 terminal-font">ffmpeg v0.12 terminal</span>
+            <span class="text-xs font-bold text-slate-400 ml-2 terminal-font">ffmpeg safe terminal</span>
           </div>
           <span id="status-badge" class="bg-slate-700 text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded terminal-font">IDLE</span>
         </div>
@@ -155,47 +154,43 @@
 
   </main>
 
+  <!-- APPLICATION JAVASCRIPT -->
   <script>
-    const { FFmpeg } = window.FFmpeg;
-    const { fetchFile, toBlobURL } = window.FFmpegUtil;
-    
+    const { createFFmpeg, fetchFile } = FFmpeg;
     let ffmpeg = null;
     let currentFile = null;
     let isProcessing = false;
 
-    // FIX: Using toBlobURL to bypass GitHub Pages CORS restrictions for Web Workers
     async function initFFmpeg() {
       if (!ffmpeg) {
-        logTerminal("> Initializing Native WebAssembly Engine (v0.12)...");
+        logTerminal("> Initializing Highly Stable FFmpeg Engine (v0.11.6 ST)...");
         document.getElementById('status-badge').textContent = 'LOADING CORE...';
         document.getElementById('status-badge').className = 'bg-amber-500/20 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded terminal-font animate-pulse';
         
-        ffmpeg = new FFmpeg();
-
-        ffmpeg.on('log', ({ message }) => {
-          logTerminal(message, message.toLowerCase().includes('error') ? 'text-rose-400' : 'text-slate-300');
+        // 🚀 THE MAGIC FIX: Forces Single Thread Core. Bypasses SharedArrayBuffer AND Worker Origin errors!
+        ffmpeg = createFFmpeg({
+          log: false,
+          corePath: 'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js'
         });
 
-        ffmpeg.on('progress', ({ progress, time }) => {
-          let pct = Math.max(0, Math.min(100, Math.round(progress * 100)));
-          document.getElementById('progress-fill').style.width = `${pct}%`;
-          document.getElementById('progress-glow').style.width = `${pct}%`;
-          document.getElementById('progress-text').textContent = `Progress: ${pct}%`;
+        // Set Logger
+        ffmpeg.setLogger(({ type, message }) => {
+          logTerminal(message, type === 'fferr' ? 'text-amber-300' : 'text-slate-300');
         });
 
-        logTerminal("> Downloading engine files locally (Blob) to bypass GitHub CORS...", "text-amber-300");
-
-        const coreBaseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-        const ffmpegBaseURL = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.7/dist/umd';
-
-        // Fetching files as blobs first ensures the Worker is treated as 'Same-Origin'
-        await ffmpeg.load({
-          coreURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.js`, 'text/javascript'),
-          wasmURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-          workerURL: await toBlobURL(`${ffmpegBaseURL}/814.ffmpeg.js`, 'text/javascript')
+        // Set Progress
+        ffmpeg.setProgress(({ ratio }) => {
+          if (ratio >= 0 && ratio <= 1) {
+            let pct = Math.max(0, Math.min(100, Math.round(ratio * 100)));
+            document.getElementById('progress-fill').style.width = `${pct}%`;
+            document.getElementById('progress-glow').style.width = `${pct}%`;
+            document.getElementById('progress-text').textContent = `Progress: ${pct}%`;
+          }
         });
+
+        await ffmpeg.load();
         
-        logTerminal("> FFmpeg engine loaded successfully! Ready.", "text-emerald-400 font-bold");
+        logTerminal("> FFmpeg engine loaded successfully! Ready to process.", "text-emerald-400 font-bold");
         document.getElementById('status-badge').textContent = 'READY';
         document.getElementById('status-badge').className = 'bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded terminal-font';
       }
@@ -264,7 +259,9 @@
         let ffmpegArgs = [];
 
         logTerminal(`> Loading file into RAM...`, "text-amber-300");
-        await ffmpeg.writeFile(inputName, await fetchFile(currentFile));
+        
+        // Load file into FFmpeg memory
+        ffmpeg.FS('writeFile', inputName, await fetchFile(currentFile));
 
         if (mode === 'audio') {
           outputName = 'extracted_audio.mp3';
@@ -281,13 +278,15 @@
            document.getElementById('time-text').textContent = `${elapsed}s`;
         }, 100);
 
-        await ffmpeg.exec(ffmpegArgs);
+        // Run the command
+        await ffmpeg.run(...ffmpegArgs);
 
         clearInterval(timerInterval);
 
         logTerminal(`> Processing complete. Building file...`, "text-emerald-400 font-bold");
         
-        const data = await ffmpeg.readFile(outputName);
+        // Read the result
+        const data = ffmpeg.FS('readFile', outputName);
         
         let mimeType = mode === 'audio' ? 'audio/mpeg' : currentFile.type;
         const blob = new Blob([data.buffer], { type: mimeType });
@@ -301,8 +300,8 @@
         logTerminal(`> Success! Downloaded: ${finalName}`, "text-emerald-400 font-black");
 
         // Clean up RAM
-        await ffmpeg.deleteFile(inputName);
-        await ffmpeg.deleteFile(outputName);
+        ffmpeg.FS('unlink', inputName);
+        ffmpeg.FS('unlink', outputName);
 
       } catch (err) {
         console.error(err);
