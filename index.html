@@ -11,9 +11,14 @@
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-  <!-- FFmpeg.wasm v0.12.10 (Latest Stable for Blob Workers) -->
+  <!-- FIX 1: Prevent 'exports is not defined' error in Browser UMD modules -->
+  <script>var exports = {};</script>
+
+  <!-- FFmpeg.wasm v0.12.10 (Engine) -->
   <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
-  <script src="https://unpkg.com/@ffmpeg/util@0.12.2/dist/umd/index.js"></script>
+  
+  <!-- FIX 2: Corrected version to v0.12.1 to resolve the 404 Error -->
+  <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
 
   <style>
     * { box-sizing: border-box; font-family: 'Inter', sans-serif; }
@@ -51,7 +56,7 @@
         <div>
           <div class="flex items-center gap-2">
             <h1 class="font-extrabold text-slate-900 text-base sm:text-lg leading-none tracking-tight">MediaExtract Pro</h1>
-            <span class="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded uppercase">FFmpeg v0.12 (Blob)</span>
+            <span class="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded uppercase">GitHub Pages Safe</span>
           </div>
           <p class="text-[11px] text-slate-500 mt-0.5 hidden sm:block font-medium">Extract Audio • Mute Video • 100% Offline</p>
         </div>
@@ -131,7 +136,7 @@
         <div class="bg-slate-800 px-4 py-2.5 flex items-center justify-between border-b border-slate-700">
           <div class="flex items-center gap-2">
             <div class="flex gap-1.5"><div class="w-3 h-3 rounded-full bg-rose-500"></div><div class="w-3 h-3 rounded-full bg-amber-500"></div><div class="w-3 h-3 rounded-full bg-emerald-500"></div></div>
-            <span class="text-xs font-bold text-slate-400 ml-2 terminal-font">ffmpeg GitHub safe terminal</span>
+            <span class="text-xs font-bold text-slate-400 ml-2 terminal-font">ffmpeg secure terminal</span>
           </div>
           <span id="status-badge" class="bg-slate-700 text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded terminal-font">IDLE</span>
         </div>
@@ -152,10 +157,12 @@
         </div>
       </div>
     </section>
+
   </main>
 
   <script>
-    const { FFmpeg } = window.FFmpegWASM;
+    // Extract definitions safely now that the 404 is fixed
+    const { FFmpeg } = window.FFmpeg;
     const { fetchFile, toBlobURL } = window.FFmpegUtil;
     
     let ffmpeg = null;
@@ -184,9 +191,9 @@
         logTerminal("> Fetching FFmpeg components as Local Blobs (Bypassing GitHub Pages CORS)...", "text-amber-300");
 
         const baseURL = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd';
-        const coreURL = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd';
+        const coreURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
 
-        // 🚀 THE MAGIC FIX: classWorkerURL forces the Worker to run from a local Blob!
+        // FIX 3: classWorkerURL forces the Web Worker to run from a local Blob!
         await ffmpeg.load({
           coreURL: await toBlobURL(`${coreURL}/ffmpeg-core.js`, 'text/javascript'),
           wasmURL: await toBlobURL(`${coreURL}/ffmpeg-core.wasm`, 'application/wasm'),
@@ -297,6 +304,7 @@
         triggerDownload(url, finalName);
         logTerminal(`> Success! Downloaded: ${finalName}`, "text-emerald-400 font-black");
 
+        // Clean up RAM
         await ffmpeg.deleteFile(inputName);
         await ffmpeg.deleteFile(outputName);
 
