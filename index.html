@@ -11,7 +11,7 @@
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-  <!-- FFmpeg.wasm v0.12+ (Latest Native Single-Threaded Version) -->
+  <!-- FFmpeg.wasm v0.12+ -->
   <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.7/dist/umd/ffmpeg.js"></script>
   <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
 
@@ -81,7 +81,6 @@
             <div class="pt-3">
               <label class="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg cursor-pointer transition shadow-md">
                 Browse Video
-                <!-- Added generic accept to fix file picker issues -->
                 <input type="file" id="file-input" accept="video/*,.mkv,.mp4,.webm,.mov,.avi" class="hidden" onchange="handleFile(event)" />
               </label>
             </div>
@@ -156,16 +155,15 @@
 
   </main>
 
-  <!-- APPLICATION JAVASCRIPT -->
   <script>
-    // FIX: Using the correct UMD exports for v0.12
-    const { FFmpeg } = FFmpegWASM;
-    const { fetchFile } = FFmpegUtil;
+    const { FFmpeg } = window.FFmpeg;
+    const { fetchFile, toBlobURL } = window.FFmpegUtil;
     
     let ffmpeg = null;
     let currentFile = null;
     let isProcessing = false;
 
+    // FIX: Using toBlobURL to bypass GitHub Pages CORS restrictions for Web Workers
     async function initFFmpeg() {
       if (!ffmpeg) {
         logTerminal("> Initializing Native WebAssembly Engine (v0.12)...");
@@ -174,12 +172,10 @@
         
         ffmpeg = new FFmpeg();
 
-        // New v0.12 Logging
         ffmpeg.on('log', ({ message }) => {
           logTerminal(message, message.toLowerCase().includes('error') ? 'text-rose-400' : 'text-slate-300');
         });
 
-        // New v0.12 Progress
         ffmpeg.on('progress', ({ progress, time }) => {
           let pct = Math.max(0, Math.min(100, Math.round(progress * 100)));
           document.getElementById('progress-fill').style.width = `${pct}%`;
@@ -187,10 +183,16 @@
           document.getElementById('progress-text').textContent = `Progress: ${pct}%`;
         });
 
-        // Load specific native single-threaded core
+        logTerminal("> Downloading engine files locally (Blob) to bypass GitHub CORS...", "text-amber-300");
+
+        const coreBaseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+        const ffmpegBaseURL = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.7/dist/umd';
+
+        // Fetching files as blobs first ensures the Worker is treated as 'Same-Origin'
         await ffmpeg.load({
-          coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
-          wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm'
+          coreURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+          workerURL: await toBlobURL(`${ffmpegBaseURL}/814.ffmpeg.js`, 'text/javascript')
         });
         
         logTerminal("> FFmpeg engine loaded successfully! Ready.", "text-emerald-400 font-bold");
@@ -214,7 +216,6 @@
     }
 
     function handleVideoUpload(file) {
-      // FIX: Improved validation to support MKV and other formats properly
       if (!file.type.startsWith('video/') && !file.name.match(/\.(mkv|mp4|webm|mov|avi)$/i)) {
         logTerminal(`> Error: ${file.name} is not a valid video file.`, "text-rose-500 font-bold");
         return;
@@ -263,7 +264,6 @@
         let ffmpegArgs = [];
 
         logTerminal(`> Loading file into RAM...`, "text-amber-300");
-        // New API for writing files
         await ffmpeg.writeFile(inputName, await fetchFile(currentFile));
 
         if (mode === 'audio') {
@@ -281,14 +281,12 @@
            document.getElementById('time-text').textContent = `${elapsed}s`;
         }, 100);
 
-        // New API for executing commands
         await ffmpeg.exec(ffmpegArgs);
 
         clearInterval(timerInterval);
 
         logTerminal(`> Processing complete. Building file...`, "text-emerald-400 font-bold");
         
-        // New API for reading files
         const data = await ffmpeg.readFile(outputName);
         
         let mimeType = mode === 'audio' ? 'audio/mpeg' : currentFile.type;
